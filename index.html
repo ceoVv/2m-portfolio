@@ -430,7 +430,7 @@ function showToast(msg){
   setTimeout(()=>t.classList.remove('show'), 1800);
 }
 
-let currentBlobUrl = null;
+let currentHtml = null;
 
 function openCase(key){
   const item = CASES[key];
@@ -438,16 +438,21 @@ function openCase(key){
   showToast('Открываем сайт…');
   try{
     const html = b64DecodeUnicode(item.b64);
-    const blob = new Blob([html], {type:'text/html'});
-    const url = URL.createObjectURL(blob);
-    currentBlobUrl = url;
+    currentHtml = html;
 
     document.getElementById('viewerTitle').textContent = item.title;
-    document.getElementById('viewerFrame').src = url;
+    // srcdoc вместо blob: — на iPhone/Safari blob-ссылки в iframe часто дают белый экран,
+    // srcdoc работает надёжно везде (iOS, Android, десктоп).
+    document.getElementById('viewerFrame').removeAttribute('src');
+    document.getElementById('viewerFrame').srcdoc = html;
     document.getElementById('viewerOpenTab').onclick = function(){
-      // На iPhone Safari новая вкладка часто не открывается из-за blob: —
-      // в этом случае просто оставляем открытым встроенный просмотрщик.
-      window.open(url, '_blank');
+      // Открыть в новой вкладке через Blob — если браузер заблокирует (частый случай на iOS),
+      // просто остаёмся во встроенном просмотрщике, он и так рабочий.
+      try{
+        const blob = new Blob([html], {type:'text/html'});
+        const url = URL.createObjectURL(blob);
+        window.open(url, '_blank');
+      }catch(e){}
     };
     document.getElementById('viewerOverlay').classList.add('open');
     document.body.style.overflow = 'hidden';
@@ -458,9 +463,9 @@ function openCase(key){
 
 function closeViewer(){
   document.getElementById('viewerOverlay').classList.remove('open');
-  document.getElementById('viewerFrame').src = 'about:blank';
+  document.getElementById('viewerFrame').srcdoc = '';
   document.body.style.overflow = '';
-  if(currentBlobUrl){ URL.revokeObjectURL(currentBlobUrl); currentBlobUrl = null; }
+  currentHtml = null;
 }
 
 document.getElementById('viewerClose').addEventListener('click', closeViewer);
